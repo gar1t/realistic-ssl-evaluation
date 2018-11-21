@@ -63,9 +63,9 @@
         evaluate_model
           --root_dir .
           --experiment_name train
-          --summary_dir ${split}
+          --summary_dir .
       requires: trained-model
-      label: ${trained-model}
+      label: ${split} ${trained-model}
       flags:
         $include: train-eval-flags
         checkpoint:
@@ -99,9 +99,13 @@
       loss_step:
         - train/total_loss_step
       val_acc:
-        - test/eval/test_accuracy
+        - eval/test_accuracy
+        - eval/valid_accuracy
+        - eval/train_accuracy
       val_acc_step:
-        - test/eval/test_accuracy_step
+        - eval/test_accuracy_step
+        - eval/valid_accuracy_step
+        - eval/train_accuracy_step
 
 - test: cifar10-4000-fullysup-olna
   steps:
@@ -114,3 +118,18 @@
         hparams: max_cons_multiplier=0
         labeled-classes: 2,3,4,5,6,7
         unlabeled-classes: 0,1,8,9
+    - run: evaluate
+      label: cifar10-4000-fullysup-olna
+      flags:
+        dataset: cifar10
+        split: test
+    - run: evaluate
+      label: cifar10-4000-fullysup-olna
+      flags:
+        dataset: cifar10
+        split: valid
+    - run: evaluate
+      label: cifar10-4000-fullysup-olna
+      flags:
+        dataset: cifar10
+        split: train
