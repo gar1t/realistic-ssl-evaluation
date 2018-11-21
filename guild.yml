@@ -1,3 +1,116 @@
-- model: cifar10-dataset
+- config: train-eval-flags
+  flags:
+    dataset:
+      description: Primary dataset
+      required: yes
+      arg-name: primary_dataset_name
+      choices:
+        - cifar10
+        - svhn
+    consistency-model:
+      description: Consistency model
+      default: mean_teacher
+      arg-name: consistency_model
+      choices:
+        - mean_teacher
+        - pi_model
+        - vat
+        - pseudo_label
+    hparams:
+      description: Additional hyper-parameters
+      arg-name: hparam_string
+
+- model: ssl
+  description: Base model for running experiments
+  default: yes
   operations:
-    prepare: build_tfrecords --dataset_name=cifar10 --directory .
+    prepare-cifar10:
+      description: Prepare CIFAR10 dataset for train and evaluate
+      main: build_tfrecords --dataset_name=cifar10 --directory .
+    train:
+      description: Train a model
+      main:
+        train_model
+        --root_dir .
+        --experiment_name train
+      requires:
+        - ${dataset}-dataset
+        - ${dataset}-${n-labeled}-labels
+      flags:
+        $include: train-eval-flags
+        secondary-dataset:
+          description: Secondary dataset
+          null-label: same as primary dataset
+          choices:
+            - cifar10
+            - svhn
+            - svhn_extra
+        n-labeled:
+          description: Number of labeled examples
+          arg-name: n_labeled
+          null-label: entire dataset
+        labeled-classes:
+          description: Comma separated list of labeled class IDs
+          null-label: all classes
+          arg-name: labeled_classes_filter
+        unlabeled-classes:
+          description: Comma separated list of unlabeled class IDs
+          null-label: all classes
+          arg-name: unlabeled_classes_filter
+    evaluate:
+      description: Evaluate a trained model
+      main:
+        evaluate_model
+          --root_dir .
+          --experiment_name train
+          --summary_dir ${split}
+      requires: trained-model
+      label: ${trained-model}
+      flags:
+        $include: train-eval-flags
+        checkpoint:
+          description: Checkpoint to evaluate
+          arg-name: evaluate_single_checkpoint
+          default: latest
+        split:
+          description: Dataset split to use for evaluation
+          default: test
+          choices:
+            - valid
+            - test
+            - train
+  resources:
+    cifar10-dataset:
+      path: data
+      sources:
+        - operation: prepare-cifar10
+    cifar10-null-labels: {}
+    cifar10-4000-labels:
+      path: data/cifar10
+      sources:
+        - data/cifar10/label_map_count_4000_index_0
+    trained-model:
+      sources:
+        - operation: train
+  extra:
+    scalars:
+      loss:
+        - train/total_loss
+      loss_step:
+        - train/total_loss_step
+      val_acc:
+        - test/eval/test_accuracy
+      val_acc_step:
+        - test/eval/test_accuracy_step
+
+- test: cifar10-4000-fullysup-olna
+  steps:
+    - run: train
+      label: cifar10-4000-fullysup-olna
+      flags:
+        dataset: cifar10
+        n-labeled: 4000
+        consistency-model: mean_teacher
+        hparams: max_cons_multiplier=0
+        labeled-classes: 2,3,4,5,6,7
+        unlabeled-classes: 0,1,8,9
