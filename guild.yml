@@ -1,0 +1,3 @@
+- model: cifar10-dataset
+  operations:
+    prepare: build_tfrecords --dataset_name=cifar10 --directory .
